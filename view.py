@@ -13,11 +13,8 @@ import pygame
 
 
 class coords(tuple):
-    def __init__(self, *args):
-        tuple.__init__(self, args)
-
     def __str__(self):
-        return "(" + ",".join(f"{v:.2}" for v in self) + ")"
+        return "(" + ",".join(f"{float(v):.2}" for v in self) + ")"
 
 class view(object):
     def __init__(self, width=640, height=400, fps=30):
@@ -32,19 +29,19 @@ class view(object):
         self.playtime = 0.0
         self.font = pygame.font.SysFont('mono', 20, bold=True)
 
-        self.c = coords(0, 0)
-        self.s = (coords(-1, 1), coords(-1, 1))
+        self.c = coords((0, 0))
+        self.s = (coords((-1, 1)), coords((-1, 1)))
 
     def zoom(self, f="in"):
         x, y = self.s
         xx = (x[1] - x[0])*0.2
         yy = (y[1] - y[0])*0.2
         if "in" == f:
-            self.s = (coords(x[0] + xx/2, x[1] - xx/2),
-                      coords(y[0] + yy/2, y[1] - yy/2))
+            self.s = (coords((x[0] + xx/2, x[1] - xx/2)),
+                      coords((y[0] + yy/2, y[1] - yy/2)))
         elif "out" == f:
-            self.s = (coords(x[0] - xx/2, x[1] + xx/2),
-                      coords(y[0] - yy/2, y[1] + yy/2))
+            self.s = (coords((x[0] - xx*0.6, x[1] + xx*0.6)),
+                      coords((y[0] - yy*0.6, y[1] + yy*0.6)))
 
     def run(self):
         running = True
