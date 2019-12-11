@@ -10,18 +10,30 @@ License: Do What The Fuck You Want To Public License (WTFPL)
          See http://sam.zoy.org/wtfpl/
 """
 import pygame
-
+import numpy as np
+import functools
 
 class coords(tuple):
     def __str__(self):
         return "(" + ",".join(f"{float(v):.2}" for v in self) + ")"
 
+    @property
+    def x(self):
+        return self[0]
+
+    @property
+    def y(self):
+        return self[1]
+
 class view(object):
-    def __init__(self, width=640, height=400, fps=30):
+    def __init__(self, fn):
+        self.fn = fn
+
+    def prepare(self, width=640, height=400, fps=30):
         pygame.init()
         pygame.display.set_caption("Press ESC to quit")
-        self.width = width
-        self.height = height
+        self.width = self.w = width
+        self.height = self.h = height
         self.screen = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
         self.background = pygame.Surface(self.screen.get_size()).convert()
         self.clock = pygame.time.Clock()
@@ -31,6 +43,14 @@ class view(object):
 
         self.c = coords((0, 0))
         self.s = (coords((-1, 1)), coords((-1, 1)))
+
+        self.repopulate()
+
+        return self
+
+    def repopulate(self):
+        buff = np.fromfunction(functools.partial(self.fn), (self.w, self.h), g=self)
+        self.surf = pygame.surfarray.make_surface(buff)
 
     def zoom(self, f="in"):
         x, y = self.s
@@ -42,6 +62,8 @@ class view(object):
         elif "out" == f:
             self.s = (coords((x[0] - xx*0.6, x[1] + xx*0.6)),
                       coords((y[0] - yy*0.6, y[1] + yy*0.6)))
+
+        self.repopulate()
 
     def run(self):
         running = True
@@ -64,7 +86,7 @@ class view(object):
             self.text_botright(f"c: {self.c} x: {self.s[0]} y: {self.s[1]}")
 
             pygame.display.flip()
-            self.screen.blit(self.background, (0, 0))
+            self.screen.blit(self.surf, (0, 0))
 
         pygame.quit()
 
