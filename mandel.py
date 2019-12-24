@@ -1,9 +1,7 @@
-import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
 from view import view
-from PIL import Image
 
 w, h, R = 1280*4, 720*4, 100
 
@@ -11,12 +9,12 @@ w, h, R = 1280*4, 720*4, 100
 @np.vectorize
 def mandel(x, y, g=None):
     x = x/g.w
-    x = x*(g.s[0][1] - g.s[0][0])
-    x = x + g.s[0][0]
+    x = x*(g.bot_right.x - g.top_left.x)
+    x = x + g.top_left.x
 
     y = y/g.h
-    y = y*(g.s[0][1] - g.s[0][0])
-    y = y + g.s[0][0]
+    y = y*(g.top_left.y - g.bot_right.y)
+    y = y + g.bot_right.y
 
     c = x + y*1j
     z = c
@@ -27,5 +25,5 @@ def mandel(x, y, g=None):
     except OverflowError:
         return 255
 
-
-mandel.prepare(width=1024, height=1024).run()
+if __name__ == "__main__":
+    mandel.prepare(width=512, height=512).run()
