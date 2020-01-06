@@ -58,14 +58,23 @@ class square:
         self.bot_right = br
         self.w, self.h = w, h
         self.ow, self.oh = ow, oh
+        self.surf = None
 
     def __str__(self):
         import itertools
         chain = itertools.chain(self.top_left, self.bot_right)
-        return "|%s|" % " ".join(f"{float(v):.2}" for v in chain)
+        at = "@ %s %s" % (self.ow, self.oh)
+        return "|%s|" % " ".join(f"{float(v):.2}" for v in chain) + at
 
     def size(self):
         return self.w, self.h
+
+    def binded(self, surf):
+        self.surf = surf
+        return self
+
+    def blit(self, surf):
+        surf.blit(self.surf, (self.ow, self.oh))
 
     def __floordiv__(self, val):
         x0, y1 = self.top_left
@@ -78,14 +87,15 @@ class square:
     def __truediv__(self, val):
         x0, y1 = self.top_left
         x1, y0 = self.bot_right
-        for i in range(0, val):
-            tl = vec(x0, y0 + (y1-y0)*i)
+        for i in reversed(range(0, val)):
+            tl = vec(x0, y0 + (y1-y0)*i/val)
             br = vec(x1, y0 + (y1-y0)*(i+1)/val)
-            yield square(tl=tl, br=br, w=self.w, h=self.h//val, oh=i*self.h//val + self.oh, ow=self.ow)
+            yield square(tl=tl, br=br, w=self.w, h=self.h//val, oh=self.h - (i+1)*self.h//val, ow=self.ow)
 
 class view(object):
     def __init__(self, fn):
         self.fn = fn
+        self.running = False
 
     def prepare(self, width=640, height=400, fps=30):
         self.g = square()
@@ -100,9 +110,12 @@ class view(object):
         pygame.display.set_caption("Press ESC to quit")
         self.screen = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
         self.image = pygame.Surface((self.width, self.height))
-        self.forgotten = pygame.Surface((self.width, self.height))
-        self.forgotten.fill(pygame.Color(0, 0, 0, 0))
-        self.blittable = None
+        self.bg = pygame.Surface((self.width, self.height))
+        self.bg.fill(pygame.Color(0, 0, 0, 0))
+        
+        self.queue = iter([])
+        self.blitted = []
+        
         self.clock = pygame.time.Clock()
         self.fps = fps
         self.playtime = 0.0
@@ -115,16 +128,11 @@ class view(object):
     def repopulate(self, reversd=False):
         from itertools import chain
         def populator():
-            sqs = self.g // 128
-            if reversd:
-                sqs = reversed(sqs)
-            for sq in self.g // 128:
-                buff = np.fromfunction(functools.partial(self.fn), sq.size(), g=sq)
-                yield pygame.surfarray.make_surface(buff), sq
-#        if self.blittable:
-#            self.blittable = chain(self.blittable, populator())
-#        else:
-        self.blittable = populator()
+            for row in self.g / 16:
+                for sq in row // 16:
+                    buff = np.fromfunction(functools.partial(self.fn), sq.size(), g=sq)
+                    yield sq.binded(pygame.surfarray.make_surface(buff))
+        self.queue = chain(populator(), self.queue)
 
     def zoom(self, f="in"):
         if "in" == f:
@@ -136,56 +144,63 @@ class view(object):
         self.repopulate()
 
     def rescope(self):
-        self.forgotten.blit(self.image, self.c)
-        self.image.fill(pygame.Color(0, 0, 0, 1))
         width = self.g.bot_right.x - self.g.top_left.x
         offset = self.c / self.g.size() * width
         self.g.bot_right -= offset
         self.g.top_left  -= offset
         self.c[:] = 0
 
-    def run(self):
-        running = True
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        running = False
-                    elif event.key == pygame.K_UP:
-                        self.zoom("in")
-                    elif event.key == pygame.K_DOWN:
-                        self.zoom("out")
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    self.drag = True
+    def update(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.running = False
+                elif event.key == pygame.K_UP:
+                    self.zoom("in")
+                elif event.key == pygame.K_DOWN:
+                    self.zoom("out")
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                self.drag = True
+                self.offdrag[:] = event.pos
+            elif event.type == pygame.MOUSEBUTTONUP:
+                self.drag = False
+                self.rescope()
+                self.repopulate()
+            elif event.type == pygame.MOUSEMOTION:
+                if self.drag:
+                    self.c += (-self.offdrag + event.pos)
                     self.offdrag[:] = event.pos
-                elif event.type == pygame.MOUSEBUTTONUP:
-                    self.drag = False
-                    self.rescope()
-                    self.repopulate()
-                elif event.type == pygame.MOUSEMOTION:
-                    if self.drag:
-                        self.c += (-self.offdrag + event.pos)
-                        self.offdrag[:] = event.pos
 
-            milliseconds = self.clock.tick(self.fps)
-            self.playtime += milliseconds / 1000.0
-            self.text_topleft(f"FPS: {self.clock.get_fps():6.3}  PLAYTIME: {self.playtime:6.3} SECONDS | {self.g.top_left}")
+        milliseconds = self.clock.tick(self.fps)
+        self.playtime += milliseconds / 1000.0
+        self.text_topleft(f"FPS: {self.clock.get_fps():6.3}  PLAYTIME: {self.playtime:6.3} SECONDS | {self.g.top_left}")
 
-            self.text_botright(f"{self.c} | {self.g.bot_right}")
+        self.text_botright(f"{self.c} | {self.g.bot_right}")
 
-            pygame.display.flip()
-            self.screen.blit(self.forgotten, (0, 0))
-            self.screen.blit(self.image, self.c)
+        pygame.display.flip()
+        self.screen.blit(self.bg, (0, 0))
 
+        try:
+            chunk = next(self.queue)
+            chunk.blit(self.screen)
+            self.blitted.append(chunk)
+        except StopIteration as e:
+            pass
+
+        for blit in self.blitted:
+            blit.blit(self.screen)
+
+    def run(self):
+        self.running = True
+        while self.running:
             try:
-                if self.blittable:
-                    blit, sq = next(self.blittable)
-                    self.image.blit(blit, (sq.ow, sq.oh))
-            except StopIteration as e:
-                self.forgotten.fill(pygame.Color(0, 0, 0, 0))
-                self.blittable = None
+                self.update()
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(str(e))
 
         pygame.quit()
 
