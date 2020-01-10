@@ -60,6 +60,14 @@ class square:
         self.ow, self.oh = ow, oh
         self.surf = None
 
+    @property
+    def tl(self):
+        return self.top_left
+    
+    @property
+    def br(self):
+        return self.bot_right
+
     def __str__(self):
         import itertools
         chain = itertools.chain(self.top_left, self.bot_right)
@@ -75,6 +83,11 @@ class square:
 
     def blit(self, surf):
         surf.blit(self.surf, (self.ow, self.oh))
+
+    def offblit(self, surf, g):
+        oh = round((self.tl.y - g.tl.y)*g.h / (g.br.y - g.tl.y))
+        ow = round((self.tl.x - g.tl.x)*g.w / (g.br.x - g.tl.x))
+        surf.blit(self.surf, (oh, ow))
 
     def __floordiv__(self, val):
         x0, y1 = self.top_left
@@ -130,9 +143,11 @@ class view(object):
         def populator():
             for row in self.g / 16:
                 for sq in row // 16:
+                    print(sq)
                     buff = np.fromfunction(functools.partial(self.fn), sq.size(), g=sq)
                     yield sq.binded(pygame.surfarray.make_surface(buff))
-        self.queue = chain(populator(), self.queue)
+        # self.queue = chain(populator(), self.queue)
+        self.queue = populator()
 
     def zoom(self, f="in"):
         if "in" == f:
@@ -175,13 +190,8 @@ class view(object):
 
         milliseconds = self.clock.tick(self.fps)
         self.playtime += milliseconds / 1000.0
-        self.text_topleft(f"FPS: {self.clock.get_fps():6.3}  PLAYTIME: {self.playtime:6.3} SECONDS | {self.g.top_left}")
-
-        self.text_botright(f"{self.c} | {self.g.bot_right}")
-
-        pygame.display.flip()
-        self.screen.blit(self.bg, (0, 0))
-
+        
+        self.screen.fill(pygame.Color(0, 0, 0))
         try:
             chunk = next(self.queue)
             chunk.blit(self.screen)
@@ -190,7 +200,13 @@ class view(object):
             pass
 
         for blit in self.blitted:
-            blit.blit(self.screen)
+            blit.offblit(self.screen, self.g)
+        #self.screen.blit(self.image, (0, 0))
+
+        self.text_topleft(f"FPS: {self.clock.get_fps():6.3}  PLAYTIME: {self.playtime:6.3} SECONDS | {self.g.top_left}")
+        self.text_botright(f"{self.c} | {self.g.bot_right}")
+
+        pygame.display.flip()
 
     def run(self):
         self.running = True
