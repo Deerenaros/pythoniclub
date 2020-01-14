@@ -53,12 +53,12 @@ class vec(np.ndarray):
         self[2] = val
 
 class square:
-    def __init__(self, tl=vec(-1, 1), br=vec(1, -1), w=1, h=1, ow=0, oh=0):
+    def __init__(self, tl=vec(-1, 1), br=vec(1, -1), w=1, h=1):
         self.top_left = tl
         self.bot_right = br
         self.w, self.h = w, h
-        self.ow, self.oh = ow, oh
         self.surf = None
+        self.g = None
 
     @property
     def tl(self):
@@ -70,24 +70,26 @@ class square:
 
     def __str__(self):
         import itertools
-        chain = itertools.chain(self.top_left, self.bot_right)
-        at = "@ %s %s" % (self.ow, self.oh)
+        chain, at = itertools.chain(self.top_left, self.bot_right), ""
+        if self.g:
+            g = self.g
+            oh = int(round((self.tl.y - g.tl.y)*g.h / (g.br.y - g.tl.y)))
+            ow = int(round((self.tl.x - g.tl.x)*g.w / (g.br.x - g.tl.x)))
+            at = "@ %s %s" % (ow, oh)
         return "|%s|" % " ".join(f"{float(v):.2}" for v in chain) + at
 
     def size(self):
         return self.w, self.h
 
-    def binded(self, surf):
+    def binded(self, surf, g=None):
         self.surf = surf
+        self.g = g
         return self
 
-    def blit(self, surf):
-        surf.blit(self.surf, (self.ow, self.oh))
-
-    def offblit(self, surf, g):
-        oh = round((self.tl.y - g.tl.y)*g.h / (g.br.y - g.tl.y))
-        ow = round((self.tl.x - g.tl.x)*g.w / (g.br.x - g.tl.x))
-        surf.blit(self.surf, (oh, ow))
+    def offblit(self, surf, g, off=(0,0)):
+        oh = g.h - int(round((self.tl.y - g.tl.y)*g.h / (g.br.y - g.tl.y))) - self.h
+        ow = int(round((self.tl.x - g.tl.x)*g.w / (g.br.x - g.tl.x)))
+        surf.blit(self.surf, (ow + off[0], oh + off[1]))
 
     def __floordiv__(self, val):
         x0, y1 = self.top_left
@@ -95,15 +97,15 @@ class square:
         for i in range(0, val):
             tl = vec(x0 + (x1-x0)*i/val, y1)
             br = vec(x0 + (x1-x0)*(i+1)/val, y0)
-            yield square(tl=tl, br=br, w=self.w//val, h=self.h, ow=i*self.w//val + self.ow, oh=self.oh)
+            yield square(tl=tl, br=br, w=self.w//val, h=self.h)
 
     def __truediv__(self, val):
-        x0, y1 = self.top_left
-        x1, y0 = self.bot_right
-        for i in reversed(range(0, val)):
+        x0, y0 = self.top_left
+        x1, y1 = self.bot_right
+        for i in range(0, val):
             tl = vec(x0, y0 + (y1-y0)*i/val)
             br = vec(x1, y0 + (y1-y0)*(i+1)/val)
-            yield square(tl=tl, br=br, w=self.w, h=self.h//val, oh=self.h - (i+1)*self.h//val, ow=self.ow)
+            yield square(tl=tl, br=br, w=self.w, h=self.h//val)
 
 class view(object):
     def __init__(self, fn):
@@ -143,9 +145,8 @@ class view(object):
         def populator():
             for row in self.g / 16:
                 for sq in row // 16:
-                    print(sq)
                     buff = np.fromfunction(functools.partial(self.fn), sq.size(), g=sq)
-                    yield sq.binded(pygame.surfarray.make_surface(buff))
+                    yield sq.binded(pygame.surfarray.make_surface(buff), self.g)
         # self.queue = chain(populator(), self.queue)
         self.queue = populator()
 
@@ -194,13 +195,13 @@ class view(object):
         self.screen.fill(pygame.Color(0, 0, 0))
         try:
             chunk = next(self.queue)
-            chunk.blit(self.screen)
+            chunk.offblit(self.screen, self.g, self.c)
             self.blitted.append(chunk)
         except StopIteration as e:
             pass
 
         for blit in self.blitted:
-            blit.offblit(self.screen, self.g)
+            blit.offblit(self.screen, self.g, self.c)
         #self.screen.blit(self.image, (0, 0))
 
         self.text_topleft(f"FPS: {self.clock.get_fps():6.3}  PLAYTIME: {self.playtime:6.3} SECONDS | {self.g.top_left}")
