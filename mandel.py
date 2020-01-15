@@ -21,7 +21,7 @@ def mandel(x, y, g=None):
     try:
         for _ in range(0, 30):
             z = z**2 + c
-        return [255, 0][abs(z) < R]
+        return 0 if abs(z) < R else 255
     except OverflowError:
         return 255
 

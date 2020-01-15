@@ -16,6 +16,7 @@ import numpy as np
 import functools
 import multiprocessing as mp
 
+
 class vec(np.ndarray):
     def __new__(self, *args):
         v = np.ndarray.__new__(vec, (len(args),), dtype=np.float)
@@ -52,6 +53,26 @@ class vec(np.ndarray):
     def z(self, val):
         self[2] = val
 
+
+class stripy:
+    def __init__(self, sq=None):
+        if sq is not None:
+            self.points = [sq.tl, sq.br]
+        else:
+            self.points = []
+
+    def __in__(self, sq):
+        return all(sq.tl.x < pt.x < sq.br.x
+                and sq.tl.y > pt.y > sq.br.y
+                for pt in self.points)
+
+    def __sub__(self, sq):
+        if sq is None or self.points is None:
+            return self
+        res = stripy()
+        res.points[:] = self.points
+
+
 class square:
     def __init__(self, tl=vec(-1, 1), br=vec(1, -1), w=1, h=1):
         self.top_left = tl
@@ -81,15 +102,21 @@ class square:
     def size(self):
         return self.w, self.h
 
-    def binded(self, surf, g=None):
-        self.surf = surf
+    def binded(self, fn, g=None):
+        self.fn = fn
         self.g = g
         return self
 
     def offblit(self, surf, g, off=(0,0)):
+        self.unlazy()
         oh = g.h - int(round((self.tl.y - g.tl.y)*g.h / (g.br.y - g.tl.y))) - self.h
         ow = int(round((self.tl.x - g.tl.x)*g.w / (g.br.x - g.tl.x)))
         surf.blit(self.surf, (ow + off[0], oh + off[1]))
+
+    def unlazy(self):
+        if not self.surf:
+            self.surf = self.fn()
+        return self
 
     def __floordiv__(self, val):
         x0, y1 = self.top_left
@@ -106,6 +133,7 @@ class square:
             tl = vec(x0, y0 + (y1-y0)*i/val)
             br = vec(x1, y0 + (y1-y0)*(i+1)/val)
             yield square(tl=tl, br=br, w=self.w, h=self.h//val)
+
 
 class view(object):
     def __init__(self, fn):
@@ -145,8 +173,10 @@ class view(object):
         def populator():
             for row in self.g / 16:
                 for sq in row // 16:
-                    buff = np.fromfunction(functools.partial(self.fn), sq.size(), g=sq)
-                    yield sq.binded(pygame.surfarray.make_surface(buff), self.g)
+                    def filler():
+                        buff = np.fromfunction(functools.partial(self.fn), sq.size(), g=sq)
+                        return pygame.surfarray.make_surface(buff)
+                    yield sq.binded(filler, self.g)
         # self.queue = chain(populator(), self.queue)
         self.queue = populator()
 
@@ -195,16 +225,17 @@ class view(object):
         self.screen.fill(pygame.Color(0, 0, 0))
         try:
             chunk = next(self.queue)
-            chunk.offblit(self.screen, self.g, self.c)
-            self.blitted.append(chunk)
+            self.blitted.append(chunk.unlazy())
         except StopIteration as e:
             pass
 
         for blit in self.blitted:
             blit.offblit(self.screen, self.g, self.c)
-        #self.screen.blit(self.image, (0, 0))
 
-        self.text_topleft(f"FPS: {self.clock.get_fps():6.3}  PLAYTIME: {self.playtime:6.3} SECONDS | {self.g.top_left}")
+        FPS = f"FPS: {self.clock.get_fps():6.3}"
+        PTIME = f"PLAYTIME: {self.playtime:6.3} SECONDS"
+        TLPOINT = f"{self.g.top_left}"
+        self.text_topleft(" | ".join((FPS, PTIME, TLPOINT)))
         self.text_botright(f"{self.c} | {self.g.bot_right}")
 
         pygame.display.flip()
