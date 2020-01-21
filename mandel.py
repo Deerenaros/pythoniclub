@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 
 from view import view
 
-w, h, R = 1280*4, 720*4, 100
+w, h = 1280*4, 720*4 #redundant
+R = 100
 
 @view
 @np.vectorize
