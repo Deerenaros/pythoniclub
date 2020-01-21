@@ -107,14 +107,15 @@ class square:
         self.g = g
         return self
 
-    def offblit(self, surf, g, off=(0,0)):
-        self.unlazy()
+    def offblit(self, surf, g, off=(0,0), color=np.vectorize(lambda x: x)):
+        c = color(self.unlazy().surf)
+        msurf = pygame.surfarray.make_surface(c)
         oh = g.h - int(round((self.tl.y - g.tl.y)*g.h / (g.br.y - g.tl.y))) - self.h
         ow = int(round((self.tl.x - g.tl.x)*g.w / (g.br.x - g.tl.x)))
-        surf.blit(self.surf, (ow + off[0], oh + off[1]))
+        surf.blit(msurf, (ow + off[0], oh + off[1]))
 
     def unlazy(self):
-        if not self.surf:
+        if self.surf is None:
             self.surf = self.fn()
         return self
 
@@ -136,11 +137,13 @@ class square:
 
 
 class view(object):
-    def __init__(self, fn):
+    def __init__(self, fn, color=lambda x: x):
         self.fn = fn
         self.running = False
 
-    def prepare(self, width=640, height=400, fps=30):
+    def prepare(self, width=640, height=400, fps=30, color=np.vectorize(lambda x: x)):
+        self.color = color
+
         self.g = square()
         self.width = self.g.w = width
         self.height = self.g.h = height
@@ -148,7 +151,7 @@ class view(object):
         self.c = vec(0, 0)
         self.offdrag = vec(0, 0)
         self.drag = False
-        
+
         pygame.init()
         pygame.display.set_caption("Press ESC to quit")
         self.screen = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
@@ -174,8 +177,7 @@ class view(object):
             for row in self.g / 16:
                 for sq in row // 16:
                     def filler():
-                        buff = np.fromfunction(functools.partial(self.fn), sq.size(), g=sq)
-                        return pygame.surfarray.make_surface(buff)
+                        return np.fromfunction(functools.partial(self.fn), sq.size(), g=sq)
                     yield sq.binded(filler, self.g)
         # self.queue = chain(populator(), self.queue)
         self.queue = populator()
@@ -230,7 +232,7 @@ class view(object):
             pass
 
         for blit in self.blitted:
-            blit.offblit(self.screen, self.g, self.c)
+            blit.offblit(self.screen, self.g, self.c, self.color)
 
         FPS = f"FPS: {self.clock.get_fps():6.3}"
         PTIME = f"PLAYTIME: {self.playtime:6.3} SECONDS"
@@ -239,6 +241,7 @@ class view(object):
         self.text_botright(f"{self.c} | {self.g.bot_right}")
 
         pygame.display.flip()
+        self.color.animate()
 
     def run(self):
         self.running = True
