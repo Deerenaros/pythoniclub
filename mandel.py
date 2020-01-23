@@ -5,11 +5,23 @@ import cv2
 
 from view import view
 
-w, h = 1280*4, 720*4 #redundant
 R = 30
 L = 4
 
-@view
+class colormap:
+    def __init__(self):
+        self.img = cv2.imread("cmap.png")
+        self.K = self.img.shape[1] / 256
+        self.R = [self.img[0, round(i*self.K)] for i in range(0, 255)]
+        self.R.append([255, 255, 255])
+
+    def __call__(self, arr2d):
+        return np.array([[self.R[pixel] for pixel in row] for row in arr2d])
+
+    def animate(self):
+        self.R = self.R[1:-1] + self.R[0:1] + self.R[-1:]
+
+@view(width=384, height=384, color=colormap())
 @np.vectorize
 def mandel(x, y, g=None):
     x = x/g.w
@@ -31,18 +43,6 @@ def mandel(x, y, g=None):
     except OverflowError:
         return 255
 
-class colormap:
-    def __init__(self):
-        self.img = cv2.imread("cmap.png")
-        self.K = self.img.shape[1] / 256
-        self.R = [self.img[0, round(i*self.K)] for i in range(0, 255)]
-        self.R.append([255, 255, 255])
-
-    def __call__(self, arr2d):
-        return np.array([[self.R[pixel] for pixel in col] for col in arr2d])
-
-    def animate(self):
-        self.R = self.R[1:-1] + self.R[0:1] + self.R[-1:]
 
 if __name__ == "__main__":
-    mandel.prepare(width=384, height=384, color=colormap()).run()
+    mandel.run()

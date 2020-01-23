@@ -74,12 +74,13 @@ class stripy:
 
 
 class square:
-    def __init__(self, tl=vec(-1, 1), br=vec(1, -1), w=1, h=1):
+    def __init__(self, tl=vec(-1, 1), br=vec(1, -1), w=1, h=1, g=None, fn=None):
         self.top_left = tl
         self.bot_right = br
         self.w, self.h = w, h
         self.surf = None
-        self.g = None
+        self.g = g
+        self.fn = fn
 
     @property
     def tl(self):
@@ -102,9 +103,9 @@ class square:
     def size(self):
         return self.w, self.h
 
-    def binded(self, fn, g=None):
-        self.fn = fn
+    def rebinded(self, g, fn):
         self.g = g
+        self.fn = fn
         return self
 
     def offblit(self, surf, g, off=(0,0), color=np.vectorize(lambda x: x)):
@@ -116,35 +117,40 @@ class square:
 
     def unlazy(self):
         if self.surf is None:
-            self.surf = self.fn()
+            self.surf = self.fn(self)
         return self
 
     def __floordiv__(self, val):
+        cls = type(self)
         x0, y1 = self.top_left
         x1, y0 = self.bot_right
         for i in range(0, val):
             tl = vec(x0 + (x1-x0)*i/val, y1)
             br = vec(x0 + (x1-x0)*(i+1)/val, y0)
-            yield square(tl=tl, br=br, w=self.w//val, h=self.h)
+            yield cls(tl=tl, br=br, w=self.w//val, h=self.h, g=self, fn=self.fn)
 
     def __truediv__(self, val):
+        cls = type(self)
         x0, y0 = self.top_left
         x1, y1 = self.bot_right
         for i in range(0, val):
             tl = vec(x0, y0 + (y1-y0)*i/val)
             br = vec(x1, y0 + (y1-y0)*(i+1)/val)
-            yield square(tl=tl, br=br, w=self.w, h=self.h//val)
+            yield cls(tl=tl, br=br, w=self.w, h=self.h//val, g=self, fn=self.fn)
 
 
 class view(object):
-    def __init__(self, fn, color=lambda x: x):
+    def __call__(self, fn):
         self.fn = fn
         self.running = False
+        return self
 
-    def prepare(self, width=640, height=400, fps=30, color=np.vectorize(lambda x: x)):
+    def __init__(self, width=640, height=400, fps=30, color=np.vectorize(lambda x: x)):
         self.color = color
 
-        self.g = square()
+        def filler(sq):
+            return np.fromfunction(self.fn, sq.size(), g=sq)
+        self.g = square(fn=filler)
         self.width = self.g.w = width
         self.height = self.g.h = height
 
@@ -167,18 +173,12 @@ class view(object):
         self.playtime = 0.0
         self.font = pygame.font.SysFont('mono', 20, bold=True)
 
-        self.repopulate()
-
-        return self
-
-    def repopulate(self, reversd=False):
+    def repopulate(self):
         from itertools import chain
         def populator():
             for row in self.g / 16:
                 for sq in row // 16:
-                    def filler():
-                        return np.fromfunction(functools.partial(self.fn), sq.size(), g=sq)
-                    yield sq.binded(filler, self.g)
+                    yield sq
         # self.queue = chain(populator(), self.queue)
         self.queue = populator()
 
@@ -244,6 +244,7 @@ class view(object):
         self.color.animate()
 
     def run(self):
+        self.repopulate()
         self.running = True
         while self.running:
             try:
