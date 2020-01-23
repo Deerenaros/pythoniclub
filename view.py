@@ -16,6 +16,7 @@ import numpy as np
 import functools
 import multiprocessing as mp
 
+from gl import *
 
 class vec(np.ndarray):
     def __new__(self, *args):
@@ -109,15 +110,16 @@ class square:
         return self
 
     def offblit(self, surf, g, off=(0,0), color=np.vectorize(lambda x: x)):
-        c = color(self.unlazy().surf)
-        msurf = pygame.surfarray.make_surface(c)
         oh = g.h - int(round((self.tl.y - g.tl.y)*g.h / (g.br.y - g.tl.y))) - self.h
         ow = int(round((self.tl.x - g.tl.x)*g.w / (g.br.x - g.tl.x)))
-        surf.blit(msurf, (ow + off[0], oh + off[1]))
+        surf.blit(self.unlazy().msurf, (ow + off[0], oh + off[1]))
 
     def unlazy(self):
         if self.surf is None:
             self.surf = self.fn(self)
+            msurf = self.msurf = pygame.surfarray.make_surface(self.surf)
+            print(">>", self.surf[0,0], self.surf.shape, self.tl)
+            print("<<", msurf.get_at((0, 0)), msurf.get_width(), msurf.get_height(), self.tl)
         return self
 
     def __floordiv__(self, val):
@@ -146,30 +148,33 @@ class view(object):
         return self
 
     def __init__(self, width=640, height=400, fps=30, color=np.vectorize(lambda x: x)):
-        self.color = color
-
         def filler(sq):
             return np.fromfunction(self.fn, sq.size(), g=sq)
         self.g = square(fn=filler)
         self.width = self.g.w = width
         self.height = self.g.h = height
+        self.fps = fps
+        self.color = color
 
+    def start(self):
         self.c = vec(0, 0)
         self.offdrag = vec(0, 0)
         self.drag = False
 
         pygame.init()
         pygame.display.set_caption("Press ESC to quit")
-        self.screen = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
+
         self.image = pygame.Surface((self.width, self.height))
-        self.bg = pygame.Surface((self.width, self.height))
-        self.bg.fill(pygame.Color(0, 0, 0, 0))
+        self.image.fill(pygame.Color(0, 0, 0, 255))
         
+        self.scrn = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
+        # pygame.display.set_mode((self.width, self.height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.HWSURFACE)
+        # glViewport(0, 0, self.width, self.height)
+
         self.queue = iter([])
         self.blitted = []
-        
+
         self.clock = pygame.time.Clock()
-        self.fps = fps
         self.playtime = 0.0
         self.font = pygame.font.SysFont('mono', 20, bold=True)
 
@@ -224,7 +229,7 @@ class view(object):
         milliseconds = self.clock.tick(self.fps)
         self.playtime += milliseconds / 1000.0
         
-        self.screen.fill(pygame.Color(0, 0, 0))
+        self.image.fill(pygame.Color(0, 0, 0))
         try:
             chunk = next(self.queue)
             self.blitted.append(chunk.unlazy())
@@ -232,7 +237,7 @@ class view(object):
             pass
 
         for blit in self.blitted:
-            blit.offblit(self.screen, self.g, self.c, self.color)
+            blit.offblit(self.image, self.g, self.c, self.color)
 
         FPS = f"FPS: {self.clock.get_fps():6.3}"
         PTIME = f"PLAYTIME: {self.playtime:6.3} SECONDS"
@@ -240,10 +245,12 @@ class view(object):
         self.text_topleft(" | ".join((FPS, PTIME, TLPOINT)))
         self.text_botright(f"{self.c} | {self.g.bot_right}")
 
+        self.scrn.blit(self.image, (0, 0))
+        # renderSplash(self.image, cmap=self.color.flush())
         pygame.display.flip()
-        self.color.animate()
 
     def run(self):
+        self.start()
         self.repopulate()
         self.running = True
         while self.running:
@@ -257,16 +264,16 @@ class view(object):
         pygame.quit()
 
     def text_topleft(self, text):
-        fw, fh = self.font.size(text)
-        surface = self.font.render(text, True, (0, 255, 0))
-        self.screen.blit(surface, (15, 15))
+        pygame.display.set_caption(text)
+        # fw, fh = self.font.size(text)
+        # surface = self.font.render(text, True, (0, 255, 0))
+        # self.screen.blit(surface, (15, 15))
     
     def text_botright(self, text):
-        fw, fh = self.font.size(text)
-        surface = self.font.render(text, True, (0, 255, 0))
-        self.screen.blit(surface, (self.width - 15 - fw, self.height - 15 - fh))
+        pass
+        # fw, fh = self.font.size(text)
+        #surface = self.font.render(text, True, (0, 255, 0))
+        # self.screen.blit(surface, (self.width - 15 - fw, self.height - 15 - fh))
 
 if __name__ == '__main__':
     view(640, 400, 60).run()
-
-

@@ -12,8 +12,11 @@ class colormap:
     def __init__(self):
         self.img = cv2.imread("cmap.png")
         self.K = self.img.shape[1] / 256
-        self.R = [self.img[0, round(i*self.K)] for i in range(0, 255)]
-        self.R.append([255, 255, 255])
+        self.R = [tuple(self.img[0, round(i*self.K)]/255) for i in range(0, 255)]
+        self.R.append((1, 1, 1))
+
+    def flush(self):
+        return f"{{ {','.join('vec4(%f,%f,%f,1)' % col for col in self.R)} }}"
 
     def __call__(self, arr2d):
         return np.array([[self.R[pixel] for pixel in row] for row in arr2d])

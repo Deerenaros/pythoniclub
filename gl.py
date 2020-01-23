@@ -1,3 +1,7 @@
+## A sample of opengl using with pygame
+## Thanks to @luke-kelly at stackoverflow
+## https://stackoverflow.com/questions/56122387/rendering-image-in-pygame-using-pyopengl
+
 import pygame
 from OpenGL.GL import *
 from OpenGL.GL import shaders
@@ -6,57 +10,31 @@ import numpy as np
 from ctypes import sizeof, c_float, c_void_p
 
 
-def renderSplash(image):
-   # using resources in open gl generally follows the form of generate, bind, modify
-
-    # Generate: request a buffer for our vertices
-    vbo = glGenBuffers(1)
-
-    # Bind: set the newly requested buffer as the active GL_ARRAY_BUFFER. 
-    #   All subsequent modifications of GL_ARRAY_BUFFER will affect our vbo
-    glBindBuffer(GL_ARRAY_BUFFER, vbo)
-
-    # Modify: Tell OpenGL to load data into the buffer. 
-
-    # I've added two more coordinates to each vertex here for determining the position within the texture.
-    # These two additional coordinates are typically refered to as uv coordinates.
-    # Also there are now two triangles that cover the entire viewport.
-    vertex_data = np.array([-1, -1, 0, 0,  -1, 1, 0, 1,  1, 1, 1, 1,  -1, -1, 0, 0,  1, 1, 1, 1,  1, -1, 1, 0], np.float32)
-    glBufferData(GL_ARRAY_BUFFER, vertex_data, GL_STATIC_DRAW)
-
-    vertex_position_attribute_location = 0
-    uv_attribute_location = 1
-
-    # glVertexAttribPointer basically works in the same way as glVertexPointer with two exceptions:
-    #   First, it can be used to set the data source for any vertex attributes.
-    #   Second, it has an option to normalize the data, which I have set to GL_FALSE.
-    glVertexAttribPointer(vertex_position_attribute_location, 2, GL_FLOAT, GL_FALSE, sizeof(c_float)*4, c_void_p(0))
-    # vertex attributes need to be enabled
-    glEnableVertexAttribArray(0)
-    glVertexAttribPointer(uv_attribute_location, 2, GL_FLOAT, GL_FALSE, sizeof(c_float)*4, c_void_p(sizeof(c_float)*2))
-    glEnableVertexAttribArray(1)
-
-    # Generate: request a texture
-    image_texture = glGenTextures(1)
-
-    # Bind: set the newly requested texture as the active GL_TEXTURE_2D.
-    #   All subsequent modifications of GL_TEXTURE_2D will affect our texture (or how it is used)
-    glBindTexture(GL_TEXTURE_2D, image_texture)
-
-
+def updateSplash(image):
     width = image.get_width()
     height = image.get_height()
-
-    # retrieve a byte string representation of the image.
-    # The 3rd parameter tells pygame to return a vertically flipped image, as the coordinate system used
-    # by pygame differs from that used by OpenGL
     image_data = pygame.image.tostring(image, "RGBA", True)
-
-    # Modify: Tell OpenGL to load data into the image
     mip_map_level = 0
     glTexImage2D(GL_TEXTURE_2D, mip_map_level, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data)
 
-    # set the filtering mode for the texture
+
+def renderSplash(image, cmap=f"{{ {','.join('vec4(%f,%f,%f,1)' % (col/255, col/255, col/255) for col in range(0, 256))} }}"):
+    vbo = glGenBuffers(1)
+    glBindBuffer(GL_ARRAY_BUFFER, vbo)
+    vertex_data = np.array([-1, -1, 0, 0,  -1, 1, 0, 1,  1, 1, 1, 1,  -1, -1, 0, 0,  1, 1, 1, 1,  1, -1, 1, 0], np.float32)
+    glBufferData(GL_ARRAY_BUFFER, vertex_data, GL_STATIC_DRAW)
+    vertex_position_attribute_location = 0
+    uv_attribute_location = 1
+    glVertexAttribPointer(vertex_position_attribute_location, 2, GL_FLOAT, GL_FALSE, sizeof(c_float)*4, c_void_p(0))
+    glEnableVertexAttribArray(0)
+    glVertexAttribPointer(uv_attribute_location, 2, GL_FLOAT, GL_FALSE, sizeof(c_float)*4, c_void_p(sizeof(c_float)*2))
+    glEnableVertexAttribArray(1)
+    
+    image_texture = glGenTextures(1)
+    glBindTexture(GL_TEXTURE_2D, image_texture)
+
+    updateSplash(image)
+
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
 
@@ -71,27 +49,25 @@ def renderSplash(image):
         }
         """, GL_VERTEX_SHADER)
 
-    fragment_shader = shaders.compileShader("""
+    fragment_shader = shaders.compileShader(f"""
         #version 330
         out vec4 fragColor;
         in vec2 uv;
         uniform sampler2D tex;
-        void main() {
+        uniform vec4 cmap[256] = {cmap};
+        int i;
+        void main() {{
+            // i = int(texture(tex, uv).r * 255);
+            // fragColor = cmap[i];
             fragColor = texture(tex, uv);
-        }
+        }}
     """, GL_FRAGMENT_SHADER)
 
     shader_program = shaders.compileProgram(vertex_shader, fragment_shader)
 
-
-    glEnableClientState(GL_VERTEX_ARRAY)
-
-    # Enable alpha blending
     glEnable(GL_BLEND)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
     glUseProgram(shader_program)
-
     glDrawArrays(GL_TRIANGLES, 0, 6)
 
 def main():
@@ -107,7 +83,6 @@ def main():
     pygame.display.set_mode(size, pygame.OPENGL | pygame.DOUBLEBUF | pygame.HWSURFACE)
     glViewport(0, 0, width, height)
 
-
     renderSplash(image)
     pygame.display.flip()
     close_window()
@@ -119,4 +94,5 @@ def close_window():
             if event.type == pygame.KEYDOWN:
                 key_pressed = True
 
-main()
+if __name__ == "__main__":
+    main()
