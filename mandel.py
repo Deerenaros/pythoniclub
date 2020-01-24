@@ -12,7 +12,9 @@ class colormap:
     def __init__(self):
         self.img = cv2.imread("cmap.png")
         self.K = self.img.shape[1] / 256
-        self.R = [tuple(self.img[0, round(i*self.K)]/255) for i in range(0, 255)]
+        self.R = []
+        self.R.append((0, 0, 0))
+        self.R += [tuple(self.img[0, round(i*self.K)]/255) for i in range(1, 255)]
         self.R.append((1, 1, 1))
 
     def flush(self):

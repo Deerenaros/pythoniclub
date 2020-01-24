@@ -116,10 +116,8 @@ class square:
 
     def unlazy(self):
         if self.surf is None:
-            self.surf = self.fn(self)
+            self.surf = np.array([[[k,k,k] for k in col] for col in self.fn(self)], dtype=np.uint8)
             msurf = self.msurf = pygame.surfarray.make_surface(self.surf)
-            print(">>", self.surf[0,0], self.surf.shape, self.tl)
-            print("<<", msurf.get_at((0, 0)), msurf.get_width(), msurf.get_height(), self.tl)
         return self
 
     def __floordiv__(self, val):
@@ -167,8 +165,8 @@ class view(object):
         self.image = pygame.Surface((self.width, self.height))
         self.image.fill(pygame.Color(0, 0, 0, 255))
         
-        self.scrn = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
-        # pygame.display.set_mode((self.width, self.height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.HWSURFACE)
+        # self.scrn = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
+        pygame.display.set_mode((self.width, self.height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.HWSURFACE)
         # glViewport(0, 0, self.width, self.height)
 
         self.queue = iter([])
@@ -245,8 +243,8 @@ class view(object):
         self.text_topleft(" | ".join((FPS, PTIME, TLPOINT)))
         self.text_botright(f"{self.c} | {self.g.bot_right}")
 
-        self.scrn.blit(self.image, (0, 0))
-        # renderSplash(self.image, cmap=self.color.flush())
+        # self.scrn.blit(self.image, (0, 0))
+        renderSplash(self.image, cmap=self.color.flush(), time=self.playtime)
         pygame.display.flip()
 
     def run(self):

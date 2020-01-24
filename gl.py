@@ -18,7 +18,7 @@ def updateSplash(image):
     glTexImage2D(GL_TEXTURE_2D, mip_map_level, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data)
 
 
-def renderSplash(image, cmap=f"{{ {','.join('vec4(%f,%f,%f,1)' % (col/255, col/255, col/255) for col in range(0, 256))} }}"):
+def renderSplash(image, cmap=f"{{ {','.join('vec4(%f,%f,%f,1)' % (col/255, col/255, col/255) for col in range(0, 256))} }}", time=0):
     vbo = glGenBuffers(1)
     glBindBuffer(GL_ARRAY_BUFFER, vbo)
     vertex_data = np.array([-1, -1, 0, 0,  -1, 1, 0, 1,  1, 1, 1, 1,  -1, -1, 0, 0,  1, 1, 1, 1,  1, -1, 1, 0], np.float32)
@@ -55,19 +55,28 @@ def renderSplash(image, cmap=f"{{ {','.join('vec4(%f,%f,%f,1)' % (col/255, col/2
         in vec2 uv;
         uniform sampler2D tex;
         uniform vec4 cmap[256] = {cmap};
+        uniform int time;
         int i;
         void main() {{
-            // i = int(texture(tex, uv).r * 255);
-            // fragColor = cmap[i];
-            fragColor = texture(tex, uv);
+            i = int(texture(tex, uv).r * 255);
+            if(i == 0 || i == 255) {{
+                fragColor = cmap[i];
+            }} else {{
+                i = (i + time/64) % 256;
+                fragColor = cmap[i];
+            }}
         }}
     """, GL_FRAGMENT_SHADER)
 
     shader_program = shaders.compileProgram(vertex_shader, fragment_shader)
+    timeLoc = glGetUniformLocation(shader_program, "time")
 
     glEnable(GL_BLEND)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
     glUseProgram(shader_program)
+    
+    glUniform1i(timeLoc, int(time*1000))
+
     glDrawArrays(GL_TRIANGLES, 0, 6)
 
 def main():
