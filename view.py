@@ -18,6 +18,21 @@ import multiprocessing as mp
 
 from gl import *
 
+def translate(fn):
+    from functools import wraps
+    @wraps(fn)
+    def wrapped(x, y, g=None):
+        x = x/g.w
+        x = x*(g.bot_right.x - g.top_left.x)
+        x = x + g.top_left.x
+
+        y = y/g.h
+        y = y*(g.top_left.y - g.bot_right.y)
+        y = y + g.bot_right.y
+        return fn(x, y)
+    return wrapped
+
+
 class vec(np.ndarray):
     def __new__(self, *args):
         v = np.ndarray.__new__(vec, (len(args),), dtype=np.float)
@@ -186,12 +201,14 @@ class view(object):
         self.queue = populator()
 
     def zoom(self, f="in"):
+        x0, y1 = self.g.top_left
+        x1, y0 = self.g.bot_right
         if "in" == f:
-            self.g.top_left  *= 0.8
-            self.g.bot_right *= 0.8
+            shiftx, shifty = (x1 - x0)/10, (y1 - y0)/10
         elif "out" == f:
-            self.g.top_left  *= 1.2
-            self.g.bot_right *= 1.2
+            shiftx, shifty = (x0 - x1)/10, (y0 - y1)/10
+        self.g.top_left  = vec(x0 + shiftx, y1 - shifty)
+        self.g.bot_right = vec(x1 - shifty, y0 + shifty)
         self.repopulate()
 
     def rescope(self):

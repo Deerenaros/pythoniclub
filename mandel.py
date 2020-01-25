@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 import cv2
 
-from view import view
+from view import view, translate
 
 R = 30
 L = 4
@@ -28,15 +28,8 @@ class colormap:
 
 @view(width=384, height=384, color=colormap())
 @np.vectorize
-def mandel(x, y, g=None):
-    x = x/g.w
-    x = x*(g.bot_right.x - g.top_left.x)
-    x = x + g.top_left.x
-
-    y = y/g.h
-    y = y*(g.top_left.y - g.bot_right.y)
-    y = y + g.bot_right.y
-
+@translate
+def mandel(x, y):
     c = x + y*1j
     z = c
     try:
