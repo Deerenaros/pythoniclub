@@ -26,7 +26,7 @@ class colormap:
     def animate(self):
         self.R = self.R[1:-1] + self.R[0:1] + self.R[-1:]
 
-@view(width=384, height=384, fps=100500, color=colormap())
+@view(width=384, height=384, fps=100500, color=colormap(), fs=False)
 @np.vectorize
 @translate
 def mandel(x, y):

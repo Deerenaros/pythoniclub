@@ -16,6 +16,8 @@ import numpy as np
 import functools
 import multiprocessing as mp
 
+from pygame.locals import *
+
 from gl import *
 
 def translate(fn):
@@ -32,6 +34,25 @@ def translate(fn):
         return fn(x, y)
     return wrapped
 
+def toggle_fullscreen():
+    screen = pygame.display.get_surface()
+    caption = pygame.display.get_caption()
+    cursor = pygame.mouse.get_cursor()  # Duoas 16-04-2007 
+    
+    w,h = screen.get_width(),screen.get_height()
+    bits = screen.get_bitsize()
+    
+    pygame.display.quit()
+    pygame.display.init()
+    
+    pygame.display.set_mode((w, h), OPENGL | DOUBLEBUF | HWSURFACE | FULLSCREEN)
+    pygame.display.set_caption(*caption)
+
+    pygame.key.set_mods(0) #HACK: work-a-round for a SDL bug??
+
+    pygame.mouse.set_cursor( *cursor )  # Duoas 16-04-2007
+    
+    return screen
 
 class vec(np.ndarray):
     def __new__(self, *args):
@@ -160,13 +181,18 @@ class view(object):
         self.running = False
         return self
 
-    def __init__(self, width=640, height=400, fps=30, color=np.vectorize(lambda x: x)):
+    def __init__(self, width=640, height=400, fps=30, color=np.vectorize(lambda x: x), fs=False):
         def filler(sq):
             return np.fromfunction(self.fn, sq.size(), g=sq)
         self.g = square(fn=filler)
-        self.width = self.g.w = width
-        self.height = self.g.h = height
+        if fs:
+            self.width = self.g.w = 1920
+            self.height = self.g.h = 1080
+        else:
+            self.width = self.g.w = width
+            self.height = self.g.h = height
         self.fps = fps
+        self.fs = fs
         self.color = color
 
     def start(self):
@@ -180,9 +206,11 @@ class view(object):
         self.image = pygame.Surface((self.width, self.height))
         self.image.fill(pygame.Color(0, 0, 0, 255))
         
-        # self.scrn = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
-        pygame.display.set_mode((self.width, self.height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.HWSURFACE)
-        # glViewport(0, 0, self.width, self.height)
+        if self.fs:
+            pygame.display.set_mode((0, 0), OPENGL | DOUBLEBUF | HWSURFACE | FULLSCREEN)
+        else:
+            pygame.display.set_mode((self.width, self.height), OPENGL | DOUBLEBUF | HWSURFACE)
+
 
         self.queue = iter([])
         self.blitted = []
@@ -229,6 +257,8 @@ class view(object):
                     self.zoom("in")
                 elif event.key == pygame.K_DOWN:
                     self.zoom("out")
+                elif event.key == pygame.K_RETURN:
+                    toggle_fullscreen()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 self.drag = True
                 self.offdrag[:] = event.pos
