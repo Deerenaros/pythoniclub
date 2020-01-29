@@ -20,6 +20,7 @@ from pygame.locals import *
 
 from gl import *
 
+
 def translate(fn):
     from functools import wraps
     @wraps(fn)
@@ -33,6 +34,7 @@ def translate(fn):
         y = y + g.bot_right.y
         return fn(x, y)
     return wrapped
+
 
 def toggle_fullscreen():
     screen = pygame.display.get_surface()
@@ -53,6 +55,7 @@ def toggle_fullscreen():
     pygame.mouse.set_cursor( *cursor )  # Duoas 16-04-2007
     
     return screen
+
 
 class vec(np.ndarray):
     def __new__(self, *args):
