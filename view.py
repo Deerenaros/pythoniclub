@@ -94,23 +94,24 @@ class vec(np.ndarray):
         self[2] = val
 
 
-class stripy:
-    def __init__(self, sq=None):
-        if sq is not None:
-            self.points = [sq.tl, sq.br]
-        else:
-            self.points = []
+def point_inside_polygon(x,y,poly):
+    """Thanks to this guy wrote this article
+    http://www.ariel.com.au/a/python-point-int-poly.html"""
 
-    def __in__(self, sq):
-        return all(sq.tl.x < pt.x < sq.br.x
-                and sq.tl.y > pt.y > sq.br.y
-                for pt in self.points)
-
-    def __sub__(self, sq):
-        if sq is None or self.points is None:
-            return self
-        res = stripy()
-        res.points[:] = self.points
+    n = len(poly)
+    inside =False
+    p1x,p1y = poly[0]
+    for i in range(n+1):
+        p2x,p2y = poly[i % n]
+        if y > min(p1y,p2y):
+            if y <= max(p1y,p2y):
+                if x <= max(p1x,p2x):
+                    if p1y != p2y:
+                        xinters = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
+                    if p1x == p2x or x <= xinters:
+                        inside = not inside
+        p1x,p1y = p2x,p2y
+    return inside
 
 
 class square:
@@ -129,6 +130,16 @@ class square:
     @property
     def br(self):
         return self.bot_right
+
+    @property
+    def points(self):
+        return ((self.tl.x, self.tl.y),
+                (self.br.x, self.tl.y),
+                (self.tl.x, self.br.y),
+                (self.br.x, self.br.y))
+
+    def __contains__(self, point):
+        return point_inside_polygon(*point, self.points)
 
     def __str__(self):
         import itertools
@@ -279,8 +290,11 @@ class view(object):
         
         self.image.fill(pygame.Color(0, 0, 0))
         try:
-            chunk = next(self.queue)
-            self.blitted.append(chunk.unlazy())
+            while True:
+                chunk = next(self.queue)
+                if not all(any(p in blit for blit in self.blitted) for p in chunk.points):
+                    self.blitted.append(chunk.unlazy())
+                    break
         except StopIteration as e:
             pass
 
