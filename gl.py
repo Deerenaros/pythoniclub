@@ -5,16 +5,15 @@
 import pygame
 from OpenGL.GL import *
 from OpenGL.GL import shaders
-import unittest
 import numpy as np
 from ctypes import sizeof, c_float, c_void_p
 
 
 def initShaders(cmap, _vars=[]):
     if not _vars:
-        _shaders = []
+        _shaders = []    # ->3.0 ES
         _shaders.append(shaders.compileShader("""
-            #version 330
+            #version 330   
             layout(location = 0) in vec2 pos;
             layout(location = 1) in vec2 uvIn;
             out vec2 uv;
@@ -109,6 +108,7 @@ def close_window():
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
                 key_pressed = True
+
 
 if __name__ == "__main__":
     main()

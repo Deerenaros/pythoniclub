@@ -1,6 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
-
 import cv2
 
 from view import view, translate
@@ -8,8 +6,10 @@ from view import view, translate
 R = 30
 L = 4
 
-class colormap:
+
+class colormap:  # doesn't use
     def __init__(self):
+        import os
         self.img = cv2.imread("cmap.png")
         self.K = self.img.shape[1] / 256
         self.R = []
@@ -42,6 +42,3 @@ def mandel(x, y):
     except OverflowError:
         return 255
 
-
-if __name__ == "__main__":
-    mandel.run()
